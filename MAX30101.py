@@ -1,7 +1,13 @@
 from smbus import SMBus
 import time
+from pyqtgraph.Qt import QtGui, QtCore
+import pyqtgraph as pg
+import numpy as np
 
-# single sample size in SpO2 Mode is 6 bytes
+# number of samples we want to read at a time (note 1 sample = 6 bytes in SpO2 mode)
+NUM_SAMPLES = 1
+
+# number of bytes in 1 sample for SpO2 Mode is 6
 SAMPLE_SIZE = 6
 
 # rpi bus line
@@ -33,7 +39,10 @@ class MAX30101():
         """
         set up for pulseOx mode
         """
-
+                
+        # buffer for data collection
+        
+                
         self.bus = SMBus(BUS)
         
         # reset
@@ -46,34 +55,48 @@ class MAX30101():
         self.set_leds(0.6)
         
         # most of these are taken from default settings on software, besides sample rate
-        # Pulse Width: 411 us; Sample Rate: 1000; ADC Full Scale Range: 8192 nA
+        # Pulse Width: 411 us; Sample Rate: 100 Hz; ADC Full Scale Range: 8192 nA
         self.set_adc_range(2)
-        self.set_sample_rate(5)
+        self.set_sample_rate(1)
         self.set_pulse_width(3) 
         
-    def is_data_ready(self):
-        # TODO: pointer wrap-around should be accounted for? not sure if this function works properly
+    def test(self):
+        """
+        function used for debugging
+        """
         write_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_WR_PTR) & 0x1F
-        read_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F  
- #       print(write_ptr, read_ptr)
-        available_samples = write_ptr - read_ptr
- #       print(available_samples)
-        return (available_samples >= SAMPLE_SIZE)
+        read_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F
+        if write_ptr >= read_ptr:
+            available_samples = write_ptr - read_ptr
+        else:
+            available_samples = 31 - read_ptr + write_ptr
+        if available_samples >= 1:
+            data = self.bus.read_i2c_block_data(PULSEOX_ADDR, FIFO_DATA, SAMPLE_SIZE)
+        print(write_ptr, read_ptr)
+        
+    def is_data_ready(self):
+        """
+        Check if there is enough data stored in the FIFO for us to read
+        """
+        write_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_WR_PTR) & 0x1F
+        read_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F 
+        print(write_ptr, read_ptr)
+        
+        # number of available samples calc needs to account for pointer wraparound
+        if write_ptr >= read_ptr:
+            available_samples = write_ptr - read_ptr
+        else:
+            available_samples = 32 - read_ptr + write_ptr
+        return (available_samples >= NUM_SAMPLES)
 
     def read_data(self):
         """
         Read data from FIFO with processing (ie. separating red and IR led data)
         """
-        # TODO: I think the FIFO read pointer needs to be incremented manually? not sure
         # make sure we have enough data to read
         while not self.is_data_ready():
             continue
-
-        # TODO: repeatedly setting mode to SpO2 ensures that data is being collected -- there's prob a better fix
-        self.spo2_mode()
-#        print(self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F)
         data = self.bus.read_i2c_block_data(PULSEOX_ADDR, FIFO_DATA, SAMPLE_SIZE)
-#        print(self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1f)
 
         # convert ints to hex format
         data = list(map(hex, data))
@@ -88,6 +111,55 @@ class MAX30101():
 
 #        print(f'red = {red}, ir == {ir}') 
         return (red, ir)
+
+    def plot_waveform(self):
+        # plot waveform - adapted from stackoverflow.com/questions/45046239/python-realtime-plot-using-pyqtgraph
+        app = QtGui.QApplication([])
+        
+        win = pg.GraphicsWindow(title='PulseOx Data')
+        win.resize(1000,600)
+        win.setWindowTitle('Waveform Data')
+        
+        p1 = win.addPlot(title='Waveform Data')
+        redCurve = p1.plot()
+        irCurve = p1.plot()
+        # p1.setRange(yRange=(0,100))
+        windowWidth = 500
+        redData = np.linspace(0,0,windowWidth)
+        irData = np.linspace(0,0,windowWidth)
+        
+        ptr = windowWidth - 1 # pointer to where data is added to our plot
+        
+        # enable antialiasing
+        pg.setConfigOptions(antialias=True)
+        
+        # reset
+        self.reset()
+      
+        # set to SpO2 mode
+        self.spo2_mode()
+        
+        # turn on LED's, set to 0.6 mA
+        self.set_leds(0.6)
+
+        # realtime data plotting
+        while True:
+            # update data
+            dataPoint = self.read_data()
+            print('hi')
+            redData[ptr] = dataPoint[0]
+            irData[ptr] = dataPoint[1]
+            # shift data windows one to the left
+            redData[:-1] = redData[1:]
+            irData[:-1] = irData[1:]
+            
+            # update plot
+            redCurve.setData(redData)
+            irCurve.setData(irData)
+            QtGui.QApplication.processEvents()
+        
+        # close Qt
+        pg.QtGui.QApplication.exec_()
 
     def spo2_mode(self):
         """
@@ -196,13 +268,13 @@ class MAX30101():
         self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte) 
          
 # pulseOx = MAX30101()
+# pulseOx.plot_waveform()
 # red = []
 # ir = []
-# for i in range(100):
+# for i in range(500):
     # data = pulseOx.read_data()
-    # red.append(data[0])
-    # ir.append(data[1])
+
 # pulseOx.reset()
 
-# print(red)
+#print(red)
 
