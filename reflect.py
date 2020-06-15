@@ -40,18 +40,19 @@ class ReflectPulseOx():
         self.reset()
       
         # set to SpO2 mode
-        self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, 0x03)
+        self.spo2_mode()
         
-        # turn on LED's, set to 0.? mA
-        self.bus.write_byte_data(PULSEOX_ADDR, LED1_PA, 0x03)
-        self.bus.write_byte_data(PULSEOX_ADDR, LED2_PA, 0x03)
+        # turn on LED's, set to 0.6 mA
+        self.set_leds(0.6)
         
-        # set spo2 settings to default on official software
+        # most of these are taken from default settings on software, besides sample rate
         # Pulse Width: 411 us; Sample Rate: 1000; ADC Full Scale Range: 8192 nA
-        self.bus.write_byte_data(PULSEOX_ADDR, SPO2_CONFIG, 0x57)
-
+        self.set_adc_range(2)
+        self.set_sample_rate(5)
+        self.set_pulse_width(3) 
+        
     def is_data_ready(self):
-        # TODO: pointer wrap-around should be accounted for? not sure if this fxn really works properly
+        # TODO: pointer wrap-around should be accounted for? not sure if this function works properly
         write_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_WR_PTR) & 0x1F
         read_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F  
  #       print(write_ptr, read_ptr)
@@ -64,18 +65,15 @@ class ReflectPulseOx():
         Read data from FIFO
         """
         # TODO: I think the FIFO read pointer needs to be incremented manually? not sure
-
         # make sure we have enough data to read
         while not self.is_data_ready():
             continue
 
         # TODO: repeatedly setting mode to SpO2 ensures that data is being collected -- there's prob a better fix
-        mode_byte = self.bus.read_byte_data(PULSEOX_ADDR, MODE_CONFIG) & 0xFF
-        mode_byte = ((mode_byte | 0x03) & 0xFB)
-        self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, mode_byte)
-
-       
+        self.spo2_mode()
+#        print(self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F)
         data = self.bus.read_i2c_block_data(PULSEOX_ADDR, FIFO_DATA, SAMPLE_SIZE)
+#        print(self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1f)
 
         # convert ints to hex format
         data = list(map(hex, data))
@@ -91,6 +89,14 @@ class ReflectPulseOx():
 #        print(f'red = {red}, ir == {ir}') 
         return (red, ir)
 
+    def spo2_mode(self):
+        """
+        Set's MAX30101 to SPO2 mode
+        """
+        mode_byte = self.bus.read_byte_data(PULSEOX_ADDR, MODE_CONFIG) & 0xFF
+        mode_byte = ((mode_byte | 0x03) & 0xFB)
+        self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, mode_byte)
+
     def set_adc_range(self, level):
         """
         Key: scale parameter to full scale setting...
@@ -105,7 +111,7 @@ class ReflectPulseOx():
 
         adc_range = self.bus.read_byte_data(PULSEOX_ADDR, SPO2_CONFIG)
         if level == 0:
-            adc_range &= 0x1F
+            adc_range &= 0x9F
         elif level == 1:
             adc_range = ((adc_range | 0x20) & 0xBF)
         elif level == 2:
@@ -164,7 +170,7 @@ class ReflectPulseOx():
         if level == 0:
             pulse &= 0xFC
         elif level == 1:
-            pulse = ((pulse | 0x01) & 0xFC)
+            pulse = ((pulse | 0x01) & 0xFD)
         elif level == 2:
             pulse = ((pulse | 0x02) & 0xFE)
         else:
@@ -172,9 +178,9 @@ class ReflectPulseOx():
 
         self.bus.write_byte_data(PULSEOX_ADDR, SPO2_CONFIG, pulse)
 
-        def set_led(self, current):
+    def set_leds(self, current):
         """
-        current is in mA and can must be between 0 and 51, inclusive
+        current is in mA and can must be between 0 and 51 (in mA), inclusive
         """
         
         led_reg = int(current / 0.2)
@@ -192,7 +198,7 @@ class ReflectPulseOx():
 pulseOx = ReflectPulseOx()
 red = []
 ir = []
-for i in range(1000):
+for i in range(100):
     data = pulseOx.read_data()
     red.append(data[0])
     ir.append(data[1])
