@@ -28,7 +28,7 @@ LED4_PA = 0x0F
 TEMP_INT = 0x1F
 TEMP_FRAC = 0x20
 
-class ReflectPulseOx():
+class MAX30101():
     def __init__(self):
         """
         set up for pulseOx mode
@@ -62,7 +62,7 @@ class ReflectPulseOx():
 
     def read_data(self):
         """
-        Read data from FIFO
+        Read data from FIFO with processing (ie. separating red and IR led data)
         """
         # TODO: I think the FIFO read pointer needs to be incremented manually? not sure
         # make sure we have enough data to read
@@ -195,14 +195,14 @@ class ReflectPulseOx():
         reset_byte |= 0x40
         self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte) 
          
-pulseOx = ReflectPulseOx()
-red = []
-ir = []
-for i in range(100):
-    data = pulseOx.read_data()
-    red.append(data[0])
-    ir.append(data[1])
-pulseOx.reset()
+# pulseOx = MAX30101()
+# red = []
+# ir = []
+# for i in range(100):
+    # data = pulseOx.read_data()
+    # red.append(data[0])
+    # ir.append(data[1])
+# pulseOx.reset()
 
-print(red)
+# print(red)
 
