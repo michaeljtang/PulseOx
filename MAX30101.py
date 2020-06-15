@@ -161,6 +161,39 @@ class MAX30101():
         # close Qt
         pg.QtGui.QApplication.exec_()
 
+    def set_sample_avg(self, level):
+        """
+        Sets number of samples averaged per FIFO sample
+
+        Key:
+        0 -> 1 samples averaged
+        1 -> 2 samples averaged
+        2 -> 4 samples averaged
+        3 -> 8 samples averaged
+        4 -> 16 samples averaged
+        5 -> 32 samples averaged
+
+        More samples averaged reduces rate of data output.
+        """
+        if level not in range(6):
+            print('Invalid input')
+            return
+        
+        fifo_config = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_CONFIG)
+        if level == 0:
+            fifo_config &= 1F
+        elif level == 1:
+            fifo_config = ((fifo_config | 0x20) & 0x3F)
+        elif level == 2:
+            fifo_config = ((fifo_config | 0x40) & 0x5F)
+        elif level == 3:
+            fifo_config = ((fifo_config | 0x60) & 0x7F)
+        elif level == 5:
+            fifo_config = ((fifo_config | 0x80) & 0x9F)
+        else:
+            fifo_config |= 0xE0
+        self.bus.write_byte_data(PULSEOX_ADDR, FIFO_CONFIG, fifo_config)
+        
     def spo2_mode(self):
         """
         Set's MAX30101 to SPO2 mode
