@@ -40,9 +40,6 @@ class MAX30101():
         set up for pulseOx mode
         """
                 
-        # buffer for data collection
-        
-                
         self.bus = SMBus(BUS)
         
         # reset
@@ -52,13 +49,15 @@ class MAX30101():
         self.spo2_mode()
         
         # turn on LED's, set to 0.6 mA
-        self.set_leds(0.6)
+        self.set_leds(0.8)
         
         # most of these are taken from default settings on software, besides sample rate
-        # Pulse Width: 411 us; Sample Rate: 100 Hz; ADC Full Scale Range: 8192 nA
+        # Pulse Width: 411 us; Sample Rate: 100 Hz; ADC Full Scale Range: 8192 nA, averaging 16 samples
         self.set_adc_range(2)
         self.set_sample_rate(1)
         self.set_pulse_width(3) 
+        self.set_sample_avg(2)
+
         
     def test(self):
         """
@@ -80,7 +79,7 @@ class MAX30101():
         """
         write_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_WR_PTR) & 0x1F
         read_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F 
-        print(write_ptr, read_ptr)
+        # print(write_ptr, read_ptr)
         
         # number of available samples calc needs to account for pointer wraparound
         if write_ptr >= read_ptr:
@@ -123,7 +122,7 @@ class MAX30101():
         p1 = win.addPlot(title='Waveform Data')
         redCurve = p1.plot()
         irCurve = p1.plot()
-        # p1.setRange(yRange=(0,100))
+        p1.setRange(yRange=(5500,6000))
         windowWidth = 500
         redData = np.linspace(0,0,windowWidth)
         irData = np.linspace(0,0,windowWidth)
@@ -133,20 +132,10 @@ class MAX30101():
         # enable antialiasing
         pg.setConfigOptions(antialias=True)
         
-        # reset
-        self.reset()
-      
-        # set to SpO2 mode
-        self.spo2_mode()
-        
-        # turn on LED's, set to 0.6 mA
-        self.set_leds(0.6)
-
         # realtime data plotting
         while True:
             # update data
             dataPoint = self.read_data()
-            print('hi')
             redData[ptr] = dataPoint[0]
             irData[ptr] = dataPoint[1]
             # shift data windows one to the left
@@ -181,7 +170,7 @@ class MAX30101():
         
         fifo_config = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_CONFIG)
         if level == 0:
-            fifo_config &= 1F
+            fifo_config &= 0x1F
         elif level == 1:
             fifo_config = ((fifo_config | 0x20) & 0x3F)
         elif level == 2:
@@ -300,8 +289,8 @@ class MAX30101():
         reset_byte |= 0x40
         self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte) 
          
-# pulseOx = MAX30101()
-# pulseOx.plot_waveform()
+pulseOx = MAX30101()
+pulseOx.plot_waveform()
 # red = []
 # ir = []
 # for i in range(500):
