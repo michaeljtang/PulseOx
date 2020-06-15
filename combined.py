@@ -29,7 +29,7 @@ def main():
     transPulseOx = CMS50D('/dev/ttyUSB0')
 
     # realtime data plotting
-    for i in range(1000):
+    while True:
         # update data
         transData[ptr] = transPulseOx.get_waveform_data()
 
@@ -38,6 +38,7 @@ def main():
         refIrDataPoint = 0
     #    while refRedDataPoint < 3000: 
         refDataPoint = refPulseOx.read_data()
+        print(refDataPoint)
         refRedData[ptr] = refDataPoint[0]
         refIrData[ptr] = refDataPoint[1]
         # shift data windows one to the left
