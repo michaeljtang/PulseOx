@@ -1,6 +1,5 @@
- import serial
+import serial
 import array
-import sys
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import numpy as np
@@ -11,7 +10,6 @@ class CMS50D(object):
         self.port = serial.Serial(portstr, 115200, timeout=0.01, stopbits=serial.STOPBITS_ONE, parity=serial.PARITY_NONE, bytesize=serial.EIGHTBITS, xonxoff=1)
         self.current_bpm = None
         self.current_spo2 = None
-        self._buf = array.array('B')
         self.port.write(b'\x7d\x81\xa1\x80\x80\x80\x80\x80\x80')      
 
     def get_waveform_data(self):
@@ -91,9 +89,9 @@ class CMS50D(object):
         self.port.close()
 
 
-pulseOx=CMS50D("/dev/ttyUSB0")
+# pulseOx=CMS50D("/dev/ttyUSB0")
 
-for x in range (0,1):
-    data=pulseOx.plot_waveform()
+# for x in range (0,1):
+    # data=pulseOx.plot_waveform()
 
-    print(data)
+    # print(data)
