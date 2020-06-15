@@ -48,15 +48,15 @@ class MAX30101():
         # set to SpO2 mode
         self.spo2_mode()
         
-        # turn on LED's, set to 0.6 mA
-        self.set_leds(0.8)
+        # turn on LED's, set to 0.8 mA
+        self.set_leds(5)
         
         # most of these are taken from default settings on software, besides sample rate
         # Pulse Width: 411 us; Sample Rate: 100 Hz; ADC Full Scale Range: 8192 nA, averaging 16 samples
-        self.set_adc_range(2)
-        self.set_sample_rate(1)
+        self.set_adc_range(3)
+        self.set_sample_rate(0)
         self.set_pulse_width(3) 
-        self.set_sample_avg(2)
+        self.set_sample_avg(1)
 
         
     def test(self):
@@ -122,7 +122,7 @@ class MAX30101():
         p1 = win.addPlot(title='Waveform Data')
         redCurve = p1.plot()
         irCurve = p1.plot()
-        p1.setRange(yRange=(5500,6000))
+        p1.setRange(yRange=(20000,22000))
         windowWidth = 500
         redData = np.linspace(0,0,windowWidth)
         irData = np.linspace(0,0,windowWidth)
@@ -276,7 +276,9 @@ class MAX30101():
         """
         current is in mA and can must be between 0 and 51 (in mA), inclusive
         """
-        
+        if current > 51 or current < 0:
+            print('Invalid Input')
+            return
         led_reg = int(current / 0.2)
         self.bus.write_byte_data(PULSEOX_ADDR, LED1_PA, led_reg)
         self.bus.write_byte_data(PULSEOX_ADDR, LED2_PA, led_reg)
