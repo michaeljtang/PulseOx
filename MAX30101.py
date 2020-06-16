@@ -48,11 +48,10 @@ class MAX30101():
         # set to SpO2 mode
         self.spo2_mode()
         
-        # good for on idx finger
         # self.set_leds(5)
         
         # for wrist
-        self.set_leds(10)
+        self.set_leds(.3)
         
         # most of these are taken from default settings on software, besides sample rate
         # Pulse Width: 411 us; Sample Rate: 50 Hz; ADC Full Scale Range: 8192 nA, averaging 2 samples
@@ -128,7 +127,7 @@ class MAX30101():
         # good window range for on idx finger
 #        p1.setRange(yRange=(20000,22000))
 
-        p1.setRange(yRange=(40000,45000))
+  #      p1.setRange(yRange=(40000,45000))
 
         windowWidth = 500
         redData = np.linspace(0,0,windowWidth)
@@ -307,5 +306,5 @@ class MAX30101():
 
 # pulseOx.reset()
 
-#print(red)
+# #print(red)
 
