@@ -3,6 +3,7 @@ import array
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import numpy as np
+import time
 
 class CMS50D(object):
     #TODO: Properly decode "finger out" flag, assuming it exists
@@ -12,13 +13,26 @@ class CMS50D(object):
         self.current_spo2 = None
         self.port.write(b'\x7d\x81\xa1\x80\x80\x80\x80\x80\x80')      
 
+    def get_data(self):
+        """
+        Returns bpm, spo2, waveform data
+
+        """
+        raw = []
+        while(len(raw) < 9):
+            raw = self.port.read(9)
+        
+        # get bits 0-6 of byte 3
+        return (raw[5] & 0x7f, raw[6] & 0x7f, raw[3] & 0x7f)
+
     def get_waveform_data(self):
         """
         Returns a single point of pulse waveform data
         """
-        raw = self.port.read(9)
+        raw = []
+        while(len(raw) < 9):
+            raw = self.port.read(9)
         
-        # get bits 0-6 of byte 3
         return raw[3] & 0x7f
         
     def plot_waveform(self):
@@ -91,7 +105,6 @@ class CMS50D(object):
 
 # pulseOx=CMS50D("/dev/ttyUSB0")
 
-# for x in range (0,1):
-    # data=pulseOx.plot_waveform()
-
+# while True:
+    # data=pulseOx.get_data()
     # print(data)
