@@ -2,6 +2,7 @@ from MAX30101 import *
 from CMS50D import *
 import csv
 import time
+from datetime import datetime
 
 def real_time_plot():    
     # plot waveform - adapted from stackoverflow.com/questions/45046239/python-realtime-plot-using-pyqtgraph
@@ -59,23 +60,22 @@ def real_time_plot():
 
 def collect_data():
     transPulseOx = CMS50D('/dev/ttyUSB0')
-
     time.sleep(5)
 
-    with open('data.csv', 'w') as csvfile:
-        fieldnames = ['Transmission', 'Reflection: Red', 'Reflection: IR']
+    with open(f'data_{datetime.now()}.csv', 'w') as csvfile:
+        fieldnames = ['time', 'bpm', 'spo2','Trans: Wave', 'Reflect: Red', 'Reflect: IR']
         writer = csv.DictWriter(csvfile, fieldnames)
         
         writer.writeheader()    
         refPulseOx = MAX30101()
-        transPulseOx = CMS50D('/dev/ttyUSB0')
-
+        start_time=time.time()
+        
         for i in range(1000):
-            transData = transPulseOx.get_waveform_data()
+            transData = transPulseOx.get_data()
             refData = refPulseOx.read_data()
             
-            writer.writerow({fieldnames[0] : transData, fieldnames[1] : refData[0], fieldnames[2] : refData[1]})
-            time.sleep(0.03)
+            writer.writerow({fieldnames[0] : time.time() - start_time, fieldnames[1] : transData[0], fieldnames[2] : transData[1], fieldnames[3] : transData[2], fieldnames[4] : refData[0], fieldnames[5] : refData[1]})
         csvfile.close()
+    refPulseOx.reset()
             
 collect_data()
