@@ -48,11 +48,14 @@ class MAX30101():
         # set to SpO2 mode
         self.spo2_mode()
         
-        # turn on LED's, set to 0.8 mA
-        self.set_leds(5)
+        # good for on idx finger
+        # self.set_leds(5)
+        
+        # for wrist
+        self.set_leds(10)
         
         # most of these are taken from default settings on software, besides sample rate
-        # Pulse Width: 411 us; Sample Rate: 100 Hz; ADC Full Scale Range: 8192 nA, averaging 16 samples
+        # Pulse Width: 411 us; Sample Rate: 50 Hz; ADC Full Scale Range: 8192 nA, averaging 2 samples
         self.set_adc_range(3)
         self.set_sample_rate(0)
         self.set_pulse_width(3) 
@@ -122,7 +125,11 @@ class MAX30101():
         p1 = win.addPlot(title='Waveform Data')
         redCurve = p1.plot()
         irCurve = p1.plot()
-        p1.setRange(yRange=(20000,22000))
+        # good window range for on idx finger
+#        p1.setRange(yRange=(20000,22000))
+
+        p1.setRange(yRange=(40000,45000))
+
         windowWidth = 500
         redData = np.linspace(0,0,windowWidth)
         irData = np.linspace(0,0,windowWidth)
@@ -291,8 +298,8 @@ class MAX30101():
         reset_byte |= 0x40
         self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte) 
          
-pulseOx = MAX30101()
-pulseOx.plot_waveform()
+# pulseOx = MAX30101()
+# pulseOx.plot_waveform()
 # red = []
 # ir = []
 # for i in range(500):
