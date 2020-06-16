@@ -1,7 +1,9 @@
 from MAX30101 import *
 from CMS50D import *
+import csv
+import time
 
-def main():    
+def real_time_plot():    
     # plot waveform - adapted from stackoverflow.com/questions/45046239/python-realtime-plot-using-pyqtgraph
     app = QtGui.QApplication([])
 
@@ -39,8 +41,8 @@ def main():
     #    while refRedDataPoint < 3000: 
         refDataPoint = refPulseOx.read_data()
         print(refDataPoint)
-        refRedData[ptr] = refDataPoint[0]
-        refIrData[ptr] = refDataPoint[1]
+        refRedData[ptr] = max(0, refDataPoint[0] - 20600)
+        refIrData[ptr] = max(0, refDataPoint[1] - 20600)
         # shift data windows one to the left
         transData[:-1] = transData[1:]
         refRedData[:-1] = refRedData[1:]
@@ -55,5 +57,25 @@ def main():
     # close Qt
     pg.QtGui.QApplication.exec_()
 
-if __name__ == "__main__":
-    main()
+def collect_data():
+    transPulseOx = CMS50D('/dev/ttyUSB0')
+
+    time.sleep(5)
+
+    with open('data.csv', 'w') as csvfile:
+        fieldnames = ['Transmission', 'Reflection: Red', 'Reflection: IR']
+        writer = csv.DictWriter(csvfile, fieldnames)
+        
+        writer.writeheader()    
+        refPulseOx = MAX30101()
+        transPulseOx = CMS50D('/dev/ttyUSB0')
+
+        for i in range(1000):
+            transData = transPulseOx.get_waveform_data()
+            refData = refPulseOx.read_data()
+            
+            writer.writerow({fieldnames[0] : transData, fieldnames[1] : refData[0], fieldnames[2] : refData[1]})
+            time.sleep(0.03)
+        csvfile.close()
+            
+collect_data()
