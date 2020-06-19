@@ -48,17 +48,18 @@ class MAX30101():
         # set to SpO2 mode
         self.spo2_mode()
         
-        # self.set_leds(5)
+        # self.set_leds(1)
         
         # for wrist
-        self.set_leds(.3)
+        self.set_leds(2)
         
         # most of these are taken from default settings on software, besides sample rate
         # Pulse Width: 411 us; Sample Rate: 50 Hz; ADC Full Scale Range: 8192 nA, averaging 2 samples
         self.set_adc_range(3)
-        self.set_sample_rate(0)
+        self.set_sample_rate(1)
         self.set_pulse_width(3) 
-        self.set_sample_avg(1)
+        self.set_sample_avg(2)
+        self.set_overflow(1)
 
         
     def test(self):
@@ -129,7 +130,7 @@ class MAX30101():
 
   #      p1.setRange(yRange=(40000,45000))
 
-        windowWidth = 500
+        windowWidth = 100
         redData = np.linspace(0,0,windowWidth)
         irData = np.linspace(0,0,windowWidth)
         
@@ -288,6 +289,23 @@ class MAX30101():
         led_reg = int(current / 0.2)
         self.bus.write_byte_data(PULSEOX_ADDR, LED1_PA, led_reg)
         self.bus.write_byte_data(PULSEOX_ADDR, LED2_PA, led_reg)
+
+    def set_overflow(self, mode):
+        """
+        mode = 0: FIFO stops getting data upon overflow
+        mode = 1: FIFO starts replacing old data upon overflow
+        """
+        if mode not in range(2):
+            print('Invalid Input')
+            return
+        
+        rollover = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_CONFIG)
+        if mode == 0:
+            rollover &= 0xEF
+        else:
+            rollover |= 0x10
+        self.bus.write_byte_data(PULSEOX_ADDR, FIFO_CONFIG, rollover)
+            
 
     def reset(self):
         """
