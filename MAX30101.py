@@ -51,15 +51,22 @@ class MAX30101():
         # self.set_leds(1)
         
         # for wrist
-        self.set_leds(2)
+        self.set_leds(20)
         
-        # most of these are taken from default settings on software, besides sample rate
-        # Pulse Width: 411 us; Sample Rate: 50 Hz; ADC Full Scale Range: 8192 nA, averaging 2 samples
+        # # most of these are taken from default settings on software, besides sample rate
+        # # Pulse Width: 411 us; Sample Rate: 50 Hz; ADC Full Scale Range: 8192 nA, averaging 2 samples
         self.set_adc_range(3)
         self.set_sample_rate(1)
-        self.set_pulse_width(3) 
+        self.set_pulse_width(2) 
         self.set_sample_avg(2)
         self.set_overflow(1)
+
+        # # tested -- work pretty good on finger
+        # self.set_adc_range(3)
+        # self.set_sample_rate(1)
+        # self.set_pulse_width(3) 
+        # self.set_sample_avg(2)
+        # self.set_overflow(1)
 
         
     def test(self):
@@ -98,10 +105,11 @@ class MAX30101():
         # make sure we have enough data to read
         while not self.is_data_ready():
             continue
+
         data = self.bus.read_i2c_block_data(PULSEOX_ADDR, FIFO_DATA, SAMPLE_SIZE)
 
         # convert ints to hex format
-        data = list(map(hex, data))
+        data = list(map(lambda x: "0x{:02x}".format(x), data))
         # ignore the 0x prefix
         data = list(map(lambda x : x[x.index('x') + 1:], data))
         # combine bytes of data
@@ -315,14 +323,13 @@ class MAX30101():
         reset_byte |= 0x40
         self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte) 
          
-# pulseOx = MAX30101()
-# pulseOx.plot_waveform()
-# red = []
-# ir = []
-# for i in range(500):
-    # data = pulseOx.read_data()
-
-# pulseOx.reset()
+pulseOx = MAX30101()
+pulseOx.plot_waveform()
+x = []
+for i in range(100):
+    data = pulseOx.read_data()
+    #print(data)
+pulseOx.reset()
 
 # #print(red)
 
