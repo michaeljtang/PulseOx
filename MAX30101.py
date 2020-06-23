@@ -7,8 +7,9 @@ import numpy as np
 # number of samples we want to read at a time (note 1 sample = 6 bytes in SpO2 mode)
 NUM_SAMPLES = 1
 
-# number of bytes in 1 sample for SpO2 Mode is 6
-SAMPLE_SIZE = 6
+# number of bytes in 1 sample for SpO2 Mode is 6, and 9 for multi-led mode
+SPO2_SIZE = 6
+MULTI_SIZE = 9
 
 # rpi bus line
 BUS = 1
@@ -31,34 +32,32 @@ LED1_PA = 0x0C
 LED2_PA = 0x0D
 LED3_PA = 0x0E
 LED4_PA = 0x0F
+MULTI_MODE_1 = 0x11
+MULTI_MODE_2 = 0x12
 TEMP_INT = 0x1F
 TEMP_FRAC = 0x20
 
 class MAX30101():
-    def __init__(self):
+    def __init__(self, mode):
         """
-        set up for pulseOx mode
+        set up max30101; there are 2 modes: spo2 and multi (for all 3 led's)
         """
                 
         self.bus = SMBus(BUS)
-        
-        # reset
-        self.reset()
       
-        # set to SpO2 mode
-        self.spo2_mode()
+        # set mode
+        if mode == 'spo2' or mode == 'SpO2':
+            self.spo2_mode(5)
+        elif mode == 'multi':
+            self.multi_mode(20)
         
-        # self.set_leds(1)
-        
-        # for wrist
-        self.set_leds(20)
         
         # # most of these are taken from default settings on software, besides sample rate
         # # Pulse Width: 411 us; Sample Rate: 50 Hz; ADC Full Scale Range: 8192 nA, averaging 2 samples
         self.set_adc_range(3)
         self.set_sample_rate(1)
-        self.set_pulse_width(2) 
-        self.set_sample_avg(2)
+        self.set_pulse_width(3) 
+        self.set_sample_avg(1)
         self.set_overflow(1)
 
         # # tested -- work pretty good on finger
@@ -67,21 +66,47 @@ class MAX30101():
         # self.set_pulse_width(3) 
         # self.set_sample_avg(2)
         # self.set_overflow(1)
-
         
-    def test(self):
+    def spo2_mode(self, current):
         """
-        function used for debugging
+        Set's MAX30101 to SPO2 mode and turns on appropriate LED's. Current specifies desired current of LED
         """
-        write_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_WR_PTR) & 0x1F
-        read_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F
-        if write_ptr >= read_ptr:
-            available_samples = write_ptr - read_ptr
-        else:
-            available_samples = 31 - read_ptr + write_ptr
-        if available_samples >= 1:
-            data = self.bus.read_i2c_block_data(PULSEOX_ADDR, FIFO_DATA, SAMPLE_SIZE)
-        print(write_ptr, read_ptr)
+        # reset
+        self.reset()
+        
+        # set mode
+        mode_byte = self.bus.read_byte_data(PULSEOX_ADDR, MODE_CONFIG) & 0xFF
+        mode_byte = ((mode_byte | 0x03) & 0xFB)
+        self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, mode_byte)
+        
+        # set current
+        self.set_red(current)
+        self.set_ir(current)
+        
+    def multi_mode(self, current):
+        """
+        Set's MAX30101 to multi-led mode (good for having all 3 led's on)
+        """
+        # reset
+        self.reset()
+        
+        # set mode
+        mode_byte = self.bus.read_byte_data(PULSEOX_ADDR, MODE_CONFIG) & 0xFF
+        mode_byte = mode_byte | 0x07
+        self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, mode_byte)
+        
+        # set config
+        register1 = self.bus.read_byte_data(PULSEOX_ADDR, MULTI_MODE_1)
+        register1 |= 0x21
+        self.bus.write_byte_data(PULSEOX_ADDR, MULTI_MODE_1, register1)
+        register2 = self.bus.read_byte_data(PULSEOX_ADDR, MULTI_MODE_2)
+        register2 |= 0x03
+        self.bus.write_byte_data(PULSEOX_ADDR, MULTI_MODE_2, register2)
+        
+        # set current
+        self.set_red(current)
+        self.set_ir(current)
+        self.set_green(current)
         
     def is_data_ready(self):
         """
@@ -98,7 +123,7 @@ class MAX30101():
             available_samples = 32 - read_ptr + write_ptr
         return (available_samples >= NUM_SAMPLES)
 
-    def read_data(self):
+    def read_spo2_data(self):
         """
         Read data from FIFO with processing (ie. separating red and IR led data)
         """
@@ -106,7 +131,7 @@ class MAX30101():
         while not self.is_data_ready():
             continue
 
-        data = self.bus.read_i2c_block_data(PULSEOX_ADDR, FIFO_DATA, SAMPLE_SIZE)
+        data = self.bus.read_i2c_block_data(PULSEOX_ADDR, FIFO_DATA, SPO2_SIZE)
 
         # convert ints to hex format
         data = list(map(lambda x: "0x{:02x}".format(x), data))
@@ -122,7 +147,7 @@ class MAX30101():
 #        print(f'red = {red}, ir == {ir}') 
         return (red, ir)
 
-    def plot_waveform(self):
+    def plot_spo2_waveform(self):
         # plot waveform - adapted from stackoverflow.com/questions/45046239/python-realtime-plot-using-pyqtgraph
         app = QtGui.QApplication([])
         
@@ -131,15 +156,11 @@ class MAX30101():
         win.setWindowTitle('Waveform Data')
         
         p1 = win.addPlot(title='Waveform Data')
-        redCurve = p1.plot()
+#        redCurve = p1.plot()
         irCurve = p1.plot()
-        # good window range for on idx finger
-#        p1.setRange(yRange=(20000,22000))
-
-  #      p1.setRange(yRange=(40000,45000))
 
         windowWidth = 100
-        redData = np.linspace(0,0,windowWidth)
+#        redData = np.linspace(0,0,windowWidth)
         irData = np.linspace(0,0,windowWidth)
         
         ptr = windowWidth - 1 # pointer to where data is added to our plot
@@ -150,16 +171,86 @@ class MAX30101():
         # realtime data plotting
         while True:
             # update data
-            dataPoint = self.read_data()
-            redData[ptr] = dataPoint[0]
+            dataPoint = self.read_spo2_data()
+#            redData[ptr] = dataPoint[0]
             irData[ptr] = dataPoint[1]
             # shift data windows one to the left
-            redData[:-1] = redData[1:]
+#            redData[:-1] = redData[1:]
             irData[:-1] = irData[1:]
             
             # update plot
-            redCurve.setData(redData)
+#            redCurve.setData(redData)
             irCurve.setData(irData)
+            QtGui.QApplication.processEvents()
+        
+        # close Qt
+        pg.QtGui.QApplication.exec_()
+
+    def read_multi_data(self):
+        """
+        Read data from FIFO with processing (ie. separating red and IR and green led data)
+        """
+        # make sure we have enough data to read
+        while not self.is_data_ready():
+            continue
+
+        data = self.bus.read_i2c_block_data(PULSEOX_ADDR, FIFO_DATA, MULTI_SIZE)
+
+        # convert ints to hex format
+        data = list(map(lambda x: "0x{:02x}".format(x), data))
+        # ignore the 0x prefix
+        data = list(map(lambda x : x[x.index('x') + 1:], data))
+        # combine bytes of data
+        red = '0x' + data[0] + data[1] + data[2]
+        ir = '0x' + data[3] + data[4] + data[5]
+        green = '0x' + data[6] + data[7] + data[8]
+        # convert back to int
+        red = int(red, 0)
+        ir = int(ir, 0)
+        green = int(green, 0)
+
+#        print(f'red = {red}, ir == {ir}') 
+        return (red, ir, green)
+
+    def plot_multi_waveform(self):
+        # plot waveform - adapted from stackoverflow.com/questions/45046239/python-realtime-plot-using-pyqtgraph
+        app = QtGui.QApplication([])
+        
+        win = pg.GraphicsWindow(title='PulseOx Data')
+        win.resize(1000,600)
+        win.setWindowTitle('Waveform Data')
+        
+        p1 = win.addPlot(title='Waveform Data')
+        redCurve = p1.plot()
+        irCurve = p1.plot()
+        greenCurve = p1.plot()
+
+        windowWidth = 100
+        redData = np.linspace(0,0,windowWidth)
+        irData = np.linspace(0,0,windowWidth)
+        greenData = np.linspace(0,0,windowWidth)
+        
+        ptr = windowWidth - 1 # pointer to where data is added to our plot
+        
+        # enable antialiasing
+        pg.setConfigOptions(antialias=True)
+        
+        # realtime data plotting
+        while True:
+            # update data
+            dataPoint = self.read_multi_data()
+            redData[ptr] = dataPoint[0]
+            irData[ptr] = dataPoint[1]
+            greenData[ptr] = dataPoint[2]
+            # shift data windows one to the left
+            redData[:-1] = redData[1:]
+            irData[:-1] = irData[1:]
+            greenData[:-1] = greenData[1:]
+            
+            # update plot
+            #redCurve.setData(redData)
+            #irCurve.setData(irData)
+            greenCurve.setData(greenData)
             QtGui.QApplication.processEvents()
         
         # close Qt
@@ -198,14 +289,6 @@ class MAX30101():
             fifo_config |= 0xE0
         self.bus.write_byte_data(PULSEOX_ADDR, FIFO_CONFIG, fifo_config)
         
-    def spo2_mode(self):
-        """
-        Set's MAX30101 to SPO2 mode
-        """
-        mode_byte = self.bus.read_byte_data(PULSEOX_ADDR, MODE_CONFIG) & 0xFF
-        mode_byte = ((mode_byte | 0x03) & 0xFB)
-        self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, mode_byte)
-
     def set_adc_range(self, level):
         """
         Key: scale parameter to full scale setting...
@@ -287,7 +370,7 @@ class MAX30101():
 
         self.bus.write_byte_data(PULSEOX_ADDR, SPO2_CONFIG, pulse)
 
-    def set_leds(self, current):
+    def set_red(self, current):
         """
         current is in mA and can must be between 0 and 51 (in mA), inclusive
         """
@@ -296,7 +379,26 @@ class MAX30101():
             return
         led_reg = int(current / 0.2)
         self.bus.write_byte_data(PULSEOX_ADDR, LED1_PA, led_reg)
+
+    def set_ir(self, current):
+        """
+        current is in mA and can must be between 0 and 51 (in mA), inclusive
+        """
+        if current > 51 or current < 0:
+            print('Invalid Input')
+            return
+        led_reg = int(current / 0.2)
         self.bus.write_byte_data(PULSEOX_ADDR, LED2_PA, led_reg)
+        
+    def set_green(self, current):
+        """
+        current is in mA and can must be between 0 and 51 (in mA), inclusive
+        """
+        if current > 51 or current < 0:
+            print('Invalid Input')
+            return
+        led_reg = int(current / 0.2)
+        self.bus.write_byte_data(PULSEOX_ADDR, LED3_PA, led_reg)
 
     def set_overflow(self, mode):
         """
@@ -323,12 +425,12 @@ class MAX30101():
         reset_byte |= 0x40
         self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte) 
          
-pulseOx = MAX30101()
-pulseOx.plot_waveform()
-x = []
+pulseOx = MAX30101('multi')
+pulseOx.plot_multi_waveform()
+# x = []
 for i in range(100):
-    data = pulseOx.read_data()
-    #print(data)
+    data = pulseOx.read_multi_data()
+    print(data)
 pulseOx.reset()
 
 # #print(red)
