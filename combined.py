@@ -94,8 +94,8 @@ def collect_multi_data():
             transData = transPulseOx.get_data()
             refData = refPulseOx.read_multi_data()
             
-            writer.writerow({fieldnames[0] : time.time() - start_time, fieldnames[1] : transData[0], fieldnames[2] : transData[1], fieldnames[3] : transData[2], fieldnames[4] : refData[0], fieldnames[5] : refData[1], fieldnames[6]: refData[1]})
+            writer.writerow({fieldnames[0] : time.time() - start_time, fieldnames[1] : transData[0], fieldnames[2] : transData[1], fieldnames[3] : transData[2], fieldnames[4] : refData[0], fieldnames[5] : refData[1], fieldnames[6]: refData[2]})
         csvfile.close()
     refPulseOx.reset()
             
-collect_multi_data()
+collect_spo2_data()
