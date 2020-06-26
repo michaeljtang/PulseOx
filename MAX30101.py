@@ -1,3 +1,6 @@
+# note -- interrupt functionality not implemented in class
+# accelerometer functionality not implemented either
+
 from smbus import SMBus
 import time
 from pyqtgraph.Qt import QtGui, QtCore
@@ -38,7 +41,7 @@ TEMP_INT = 0x1F
 TEMP_FRAC = 0x20
 
 class MAX30101():
-    def __init__(self, mode):
+    def __init__(self, mode='spo2', led=10, adc_range=1, sample_rate=1, pulse_width=3, sample_avg=2):
         """
         set up max30101; there are 2 modes: spo2 and multi (for all 3 led's)
         """
@@ -47,29 +50,35 @@ class MAX30101():
       
         # set mode
         if mode == 'spo2' or mode == 'SpO2':
-            self.spo2_mode(5)
+            self.spo2_mode(led)
         elif mode == 'multi':
-            self.multi_mode(20)
+            self.multi_mode(led)
         
         
         # # most of these are taken from default settings on software, besides sample rate
         # # Pulse Width: 411 us; Sample Rate: 50 Hz; ADC Full Scale Range: 8192 nA, averaging 2 samples
-        self.set_adc_range(3)
-        self.set_sample_rate(1)
-        self.set_pulse_width(3) 
-        self.set_sample_avg(1)
+        self.set_adc_range(adc_range)
+        self.set_sample_rate(sample_rate)
+        self.set_pulse_width(pulse_width)
+        self.set_sample_avg(sample_avg)
+        
         self.set_overflow(1)
-
-        # # tested -- work pretty good on finger
+        
+        # wrist test
+        # self.set_adc_range(1)
+        # self.set_sample_rate(1)
+        # self.set_pulse_width(3) 
+        # self.set_sample_avg(2)
+        
+        # # settings for finger, using LED = 4
         # self.set_adc_range(3)
         # self.set_sample_rate(1)
         # self.set_pulse_width(3) 
         # self.set_sample_avg(2)
-        # self.set_overflow(1)
-        
+    
     def spo2_mode(self, current):
         """
-        Set's MAX30101 to SPO2 mode and turns on appropriate LED's. Current specifies desired current of LED
+        Sets MAX30101 to SPO2 mode and turns on appropriate LED's. Current specifies desired current of LED
         """
         # reset
         self.reset()
@@ -85,7 +94,7 @@ class MAX30101():
         
     def multi_mode(self, current):
         """
-        Set's MAX30101 to multi-led mode (good for having all 3 led's on)
+        Sets MAX30101 to multi-led mode (good for having all 3 led's on)
         """
         # reset
         self.reset()
@@ -125,7 +134,7 @@ class MAX30101():
 
     def read_spo2_data(self):
         """
-        Read data from FIFO with processing (ie. separating red and IR led data)
+        Read data from FIFO with processing (ie. separating red and IR led data). Returns red and IR led data
         """
         # make sure we have enough data to read
         while not self.is_data_ready():
@@ -148,6 +157,9 @@ class MAX30101():
         return (red, ir)
 
     def plot_spo2_waveform(self):
+        """
+        Real time plot of red, ir led waveforms while in spo2 mode
+        """
         # plot waveform - adapted from stackoverflow.com/questions/45046239/python-realtime-plot-using-pyqtgraph
         app = QtGui.QApplication([])
         
@@ -156,11 +168,11 @@ class MAX30101():
         win.setWindowTitle('Waveform Data')
         
         p1 = win.addPlot(title='Waveform Data')
-#        redCurve = p1.plot()
+        redCurve = p1.plot()
         irCurve = p1.plot()
 
         windowWidth = 100
-#        redData = np.linspace(0,0,windowWidth)
+        redData = np.linspace(0,0,windowWidth)
         irData = np.linspace(0,0,windowWidth)
         
         ptr = windowWidth - 1 # pointer to where data is added to our plot
@@ -172,15 +184,15 @@ class MAX30101():
         while True:
             # update data
             dataPoint = self.read_spo2_data()
-#            redData[ptr] = dataPoint[0]
+            redData[ptr] = dataPoint[0]
             irData[ptr] = dataPoint[1]
             # shift data windows one to the left
-#            redData[:-1] = redData[1:]
+            redData[:-1] = redData[1:]
             irData[:-1] = irData[1:]
             
             # update plot
-#            redCurve.setData(redData)
-            irCurve.setData(irData)
+            redCurve.setData(redData)
+#            irCurve.setData(irData)
             QtGui.QApplication.processEvents()
         
         # close Qt
@@ -213,6 +225,9 @@ class MAX30101():
         return (red, ir, green)
 
     def plot_multi_waveform(self):
+        """
+        Real time plot of red, ir, green led waveforms while in multi-led mode
+        """
         # plot waveform - adapted from stackoverflow.com/questions/45046239/python-realtime-plot-using-pyqtgraph
         app = QtGui.QApplication([])
         
@@ -291,7 +306,9 @@ class MAX30101():
         
     def set_adc_range(self, level):
         """
-        Key: scale parameter to full scale setting...
+        Set ADC full scale range
+        
+        Levels: scale parameter to full scale setting...
         0 -> 2048 nA
         1 -> 4096 nA
         2 -> 8192 nA
@@ -314,6 +331,9 @@ class MAX30101():
 
     def set_sample_rate(self, level):
         """
+        Set sample rate
+        
+        Level:
         0 = 50 Hz
         1 = 100 Hz
         2 = 200 Hz
@@ -349,6 +369,8 @@ class MAX30101():
 
     def set_pulse_width(self, level):
         """
+        Set pulse width of led; indirectly influences ADC resolution as well (check datasheet)
+        
         0 = 69 us
         1 = 118 us
         2 = 215 us
@@ -372,6 +394,8 @@ class MAX30101():
 
     def set_red(self, current):
         """
+        set red LED
+        
         current is in mA and can must be between 0 and 51 (in mA), inclusive
         """
         if current > 51 or current < 0:
@@ -382,6 +406,8 @@ class MAX30101():
 
     def set_ir(self, current):
         """
+        sets IR LED
+        
         current is in mA and can must be between 0 and 51 (in mA), inclusive
         """
         if current > 51 or current < 0:
@@ -392,6 +418,8 @@ class MAX30101():
         
     def set_green(self, current):
         """
+        sets green LED
+        
         current is in mA and can must be between 0 and 51 (in mA), inclusive
         """
         if current > 51 or current < 0:
@@ -425,13 +453,13 @@ class MAX30101():
         reset_byte |= 0x40
         self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte) 
          
-pulseOx = MAX30101('multi')
-pulseOx.plot_multi_waveform()
-# x = []
-for i in range(100):
-    data = pulseOx.read_multi_data()
-    print(data)
-pulseOx.reset()
+pulseOx = MAX30101(mode='spo2',led=10, adc_range=1, sample_rate=1, pulse_width=3, sample_avg=2)
+pulseOx.plot_spo2_waveform()
+# # x = []
+# for i in range(100):
+    # data = pulseOx.read_multi_data()
+    # print(data)
+# pulseOx.reset()
 
 # #print(red)
 
