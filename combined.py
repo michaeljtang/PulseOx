@@ -67,10 +67,12 @@ def collect_spo2_data():
         writer = csv.DictWriter(csvfile, fieldnames)
         
         writer.writeheader()    
-        refPulseOx = MAX30101('spo2')
+        refPulseOx = MAX30101(mode='spo2',led=18 , adc_range=2 , sample_rate=1, pulse_width=3, sample_avg=2)
         start_time=time.time()
         
-        for i in range(500):
+        # if we collect data for any longer than around 1700 times, the transmission pulseOx stops feeding data -- not sure why. The handshake may need to be sent periodically, easy fix
+        for i in range(1500):
+            print(i)
             transData = transPulseOx.get_data()
             refData = refPulseOx.read_spo2_data()
             

@@ -3,6 +3,8 @@
 
 from smbus import SMBus
 import time
+import csv
+from datetime import datetime
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
 import numpy as np
@@ -24,6 +26,8 @@ ACCEL_ADDR = 0x19
 # assorted register addresses
 INT_STAT_1 = 0x00
 INT_STAT_2 = 0x01
+INT_ENABLE_1 = 0x02
+INT_ENABLE_2 = 0x03
 FIFO_WR_PTR = 0x04
 FIFO_OVF = 0x05
 FIFO_RD_PTR = 0x06
@@ -152,7 +156,7 @@ class MAX30101():
         # convert back to int
         red = int(red, 0)
         ir = int(ir, 0)
-
+        
 #        print(f'red = {red}, ir == {ir}') 
         return (red, ir)
 
@@ -443,7 +447,6 @@ class MAX30101():
         else:
             rollover |= 0x10
         self.bus.write_byte_data(PULSEOX_ADDR, FIFO_CONFIG, rollover)
-            
 
     def reset(self):
         """
@@ -451,10 +454,26 @@ class MAX30101():
         """
         reset_byte = self.bus.read_byte_data(PULSEOX_ADDR, MODE_CONFIG)
         reset_byte |= 0x40
-        self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte) 
-         
-pulseOx = MAX30101(mode='spo2',led=10, adc_range=1, sample_rate=1, pulse_width=3, sample_avg=2)
-pulseOx.plot_spo2_waveform()
+        self.bus.write_byte_data(PULSEOX_ADDR, MODE_CONFIG, reset_byte)
+        
+    def collect_spo2_data(self):
+        time.sleep(5)
+        with open(f'data_{datetime.now()}.csv', 'w') as csvfile:
+            fieldnames = ['time', 'Reflect: Red', 'Reflect: IR']
+            writer = csv.DictWriter(csvfile, fieldnames)
+            
+            writer.writeheader()    
+            start_time=time.time()
+            
+            for i in range(200):
+                refData = self.read_spo2_data()
+                
+                writer.writerow({fieldnames[0] : time.time() - start_time, fieldnames[1] : refData[0], fieldnames[2] : refData[1]})
+            csvfile.close()
+        self.reset()
+
+#pulseOx = MAX30101(mode='spo2',led=18 , adc_range=2 , sample_rate=1, pulse_width=3, sample_avg=2)
+#pulseOx.plot_spo2_waveform()
 # # x = []
 # for i in range(100):
     # data = pulseOx.read_multi_data()
