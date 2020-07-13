@@ -1,4 +1,4 @@
-# note -- interrupt functionality not implemented in class
+# NOTE -- interrupt functionality not implemented in class
 # accelerometer functionality not implemented either
 
 from smbus import SMBus
@@ -47,7 +47,11 @@ TEMP_FRAC = 0x20
 class MAX30101():
     def __init__(self, mode='spo2', led=10, adc_range=1, sample_rate=1, pulse_width=3, sample_avg=2):
         """
-        set up max30101; there are 2 modes: spo2 and multi (for all 3 led's)
+        set up max30101; there are 2 modes: 'spo2' and 'multi' (for all 3 led's)
+        
+        Recommended Settings?
+        Finger: LED = 4, adc_range = 3, sample_rate = 1, pulse_width = 3, sample_avg = 2
+        Wrist: LED = 14, adc_range = 3, sample_rate = 1, pulse_width = 3, sample_avg = 2
         """
                 
         self.bus = SMBus(BUS)
@@ -58,33 +62,20 @@ class MAX30101():
         elif mode == 'multi':
             self.multi_mode(led)
         
-        
-        # # most of these are taken from default settings on software, besides sample rate
-        # # Pulse Width: 411 us; Sample Rate: 50 Hz; ADC Full Scale Range: 8192 nA, averaging 2 samples
+        # set settings for PulseOx data
         self.set_adc_range(adc_range)
         self.set_sample_rate(sample_rate)
         self.set_pulse_width(pulse_width)
         self.set_sample_avg(sample_avg)
         
+        # turn on data overflow
         self.set_overflow(1)
         
-        # wrist test
-        # self.set_adc_range(1)
-        # self.set_sample_rate(1)
-        # self.set_pulse_width(3) 
-        # self.set_sample_avg(2)
-        
-        # # settings for finger, using LED = 4
-        # self.set_adc_range(3)
-        # self.set_sample_rate(1)
-        # self.set_pulse_width(3) 
-        # self.set_sample_avg(2)
-    
     def spo2_mode(self, current):
         """
         Sets MAX30101 to SPO2 mode and turns on appropriate LED's. Current specifies desired current of LED
         """
-        # reset
+        # reset, mainly to clear stack
         self.reset()
         
         # set mode
@@ -98,7 +89,7 @@ class MAX30101():
         
     def multi_mode(self, current):
         """
-        Sets MAX30101 to multi-led mode (good for having all 3 led's on)
+        Sets MAX30101 to multi-led mode (good for having all 3 led's on). Current specifies desired current of LED
         """
         # reset
         self.reset()
@@ -123,22 +114,22 @@ class MAX30101():
         
     def is_data_ready(self):
         """
-        Check if there is enough data stored in the FIFO for us to read
+        Check if there is enough data stored in the FIFO for us to read.
         """
         write_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_WR_PTR) & 0x1F
         read_ptr = self.bus.read_byte_data(PULSEOX_ADDR, FIFO_RD_PTR) & 0x1F 
-        # print(write_ptr, read_ptr)
         
-        # number of available samples calc needs to account for pointer wraparound
+        # number of available samples calculation needs to account for pointer wraparound
         if write_ptr >= read_ptr:
             available_samples = write_ptr - read_ptr
         else:
+            # the 32 is because the FIFO stores 32 data points
             available_samples = 32 - read_ptr + write_ptr
         return (available_samples >= NUM_SAMPLES)
 
     def read_spo2_data(self):
         """
-        Read data from FIFO with processing (ie. separating red and IR led data). Returns red and IR led data
+        Read data from FIFO with processing (ie. separating red and IR led data). Returns tuple (red data, ir data) 
         """
         # make sure we have enough data to read
         while not self.is_data_ready():
@@ -157,7 +148,6 @@ class MAX30101():
         red = int(red, 0)
         ir = int(ir, 0)
         
-#        print(f'red = {red}, ir == {ir}') 
         return (red, ir)
 
     def plot_spo2_waveform(self):
@@ -196,7 +186,7 @@ class MAX30101():
             
             # update plot
             redCurve.setData(redData)
-#            irCurve.setData(irData)
+            irCurve.setData(irData)
             QtGui.QApplication.processEvents()
         
         # close Qt
@@ -204,7 +194,7 @@ class MAX30101():
 
     def read_multi_data(self):
         """
-        Read data from FIFO with processing (ie. separating red and IR and green led data)
+        Read data from FIFO with processing (ie. separating red and IR and green led data). Returns tuple (red data, ir data, green data)
         """
         # make sure we have enough data to read
         while not self.is_data_ready():
@@ -225,7 +215,6 @@ class MAX30101():
         ir = int(ir, 0)
         green = int(green, 0)
 
-#        print(f'red = {red}, ir == {ir}') 
         return (red, ir, green)
 
     def plot_multi_waveform(self):
@@ -267,8 +256,8 @@ class MAX30101():
             greenData[:-1] = greenData[1:]
             
             # update plot
-            #redCurve.setData(redData)
-            #irCurve.setData(irData)
+            redCurve.setData(redData)
+            irCurve.setData(irData)
             greenCurve.setData(greenData)
             QtGui.QApplication.processEvents()
         
@@ -472,13 +461,10 @@ class MAX30101():
             csvfile.close()
         self.reset()
 
+### SAMPLE USAGE
 #pulseOx = MAX30101(mode='spo2',led=18 , adc_range=2 , sample_rate=1, pulse_width=3, sample_avg=2)
 #pulseOx.plot_spo2_waveform()
-# # x = []
 # for i in range(100):
     # data = pulseOx.read_multi_data()
     # print(data)
 # pulseOx.reset()
-
-# #print(red)
-
